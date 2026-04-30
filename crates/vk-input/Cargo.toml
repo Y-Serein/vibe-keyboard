@@ -1,0 +1,8 @@
+[package]
+name = "vk-input"
+description = "Vibe Keyboard input abstraction — button, encoder, LED, speaker traits"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+vk-core = { workspace = true }

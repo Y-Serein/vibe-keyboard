@@ -1,0 +1,8 @@
+[package]
+name = "vk-display"
+description = "Vibe Keyboard display driver — framebuffer, DisplayDriver trait, color space"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+bytemuck = { version = "1", features = ["derive"] }

@@ -1,0 +1,63 @@
+/* Design Tokens — Vibe Keyboard */
+
+:root {
+  /* Colors */
+  --primary: #6b5b7b;
+  --primary-light: #e8e4ec;
+  --bg: #c8c0d8;
+  --surface: #fff;
+  --text: #333;
+  --text-secondary: #555;
+  --text-muted: #9ca3af;
+  --border: #d1d5db;
+  --success: #22c55e;
+  --danger: #ef4444;
+  --danger-light: #fca5a5;
+  --warning: #f59e0b;
+  --info: #3b82f6;
+  --lcd-bg: #111827;
+  --lcd-border: #1f2937;
+  --lcd-allow: #34d399;
+  --terminal-bg: #1a1a2e;
+  --btn-gradient-start: #f7f5f9;
+  --btn-gradient-end: #dedad4;
+
+  /* Typography */
+  --font-sans: 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'SF Mono', 'Menlo', monospace;
+  --font-size-xs: 10px;
+  --font-size-sm: 11px;
+  --font-size-md: 12px;
+  --font-size-lg: 14px;
+  --font-size-xl: 20px;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 14px;
+  --space-lg: 18px;
+  --space-xl: 30px;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* Shadows */
+  --shadow-card: 0 2px 8px rgba(0,0,0,0.06);
+  --shadow-btn: 0 2px 6px rgba(0,0,0,0.14), inset 0 1px 0 rgba(255,255,255,0.9);
+  --shadow-container: 0 4px 16px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.6);
+  --shadow-btn-pressed: 0 1px 2px rgba(0,0,0,0.15);
+}
+
+/* Animations */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

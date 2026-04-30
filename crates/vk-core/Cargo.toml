@@ -1,0 +1,12 @@
+[package]
+name = "vk-core"
+description = "Vibe Keyboard shared types — zero external dependencies"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"], optional = true }
+
+[features]
+default = ["serde"]
+serde = ["dep:serde"]

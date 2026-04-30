@@ -1,0 +1,22 @@
+[package]
+name = "vk-protocol-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+vk-protocol = { path = ".." }
+
+[[bin]]
+name = "decode_uplink"
+path = "fuzz_targets/decode_uplink.rs"
+
+[[bin]]
+name = "decode_downlink"
+path = "fuzz_targets/decode_downlink.rs"

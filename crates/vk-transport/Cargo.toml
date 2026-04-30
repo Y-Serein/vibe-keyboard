@@ -1,0 +1,15 @@
+[package]
+name = "vk-transport"
+description = "Vibe Keyboard transport layer — async IPC and channel transports"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+vk-core = { workspace = true }
+vk-protocol = { workspace = true }
+tokio = { version = "1", features = ["sync", "net", "io-util", "rt-multi-thread", "macros", "time"] }
+async-trait = "0.1"
+
+[dev-dependencies]
+vk-ui = { workspace = true }
+vk-display = { workspace = true }

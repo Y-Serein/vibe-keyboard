@@ -1,0 +1,8 @@
+[package]
+name = "vk-protocol"
+description = "Vibe Keyboard communication protocol — message types, codec, transport trait"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+vk-core = { workspace = true }

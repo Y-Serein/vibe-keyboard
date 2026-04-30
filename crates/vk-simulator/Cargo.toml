@@ -1,0 +1,18 @@
+[package]
+name = "vk-simulator"
+description = "Vibe Keyboard simulator — CLI and GUI modes for development and testing"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+vk-core = { workspace = true }
+vk-protocol = { workspace = true }
+vk-transport = { workspace = true }
+vk-display = { workspace = true }
+vk-input = { workspace = true }
+vk-ui = { workspace = true }
+tokio = { workspace = true }
+clap = { workspace = true }
+tracing = { workspace = true }
+crossterm = { workspace = true }
+rodio = "0.20"

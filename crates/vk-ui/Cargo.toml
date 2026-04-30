@@ -1,0 +1,11 @@
+[package]
+name = "vk-ui"
+description = "Vibe Keyboard UI engine — widgets, screen state machine, renderer"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+vk-protocol = { workspace = true }
+vk-display = { workspace = true }
+vk-input = { workspace = true }
+unifont = "1.1.0"

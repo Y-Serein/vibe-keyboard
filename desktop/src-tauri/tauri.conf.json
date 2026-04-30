@@ -1,0 +1,26 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicegui/nicegui/main/tauri.conf.json",
+  "productName": "Vibe Keyboard",
+  "version": "0.1.0",
+  "identifier": "com.vibecoding.keyboard",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:15173",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Vibe Keyboard",
+        "width": 680,
+        "height": 820,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  }
+}
