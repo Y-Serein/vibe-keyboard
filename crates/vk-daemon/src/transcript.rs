@@ -62,7 +62,11 @@ impl FileOffset {
         };
 
         let modified = metadata.modified().ok();
-        if modified == self.last_modified && self.offset > 0 {
+        let file_len = metadata.len();
+        if file_len < self.offset {
+            self.offset = 0;
+        }
+        if modified == self.last_modified && self.offset > 0 && file_len == self.offset {
             return false;
         }
 
@@ -71,7 +75,6 @@ impl FileOffset {
             Err(_) => return false,
         };
 
-        let file_len = metadata.len();
         let mut reader = std::io::BufReader::new(file);
 
         // First read of large file: skip to last 4MB (need enough to find human messages)

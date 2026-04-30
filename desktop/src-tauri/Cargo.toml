@@ -4,10 +4,14 @@ version = "0.1.0"
 edition = "2024"
 
 [build-dependencies]
+# tauri-build pulls schemars with preserve_order; schemars 0.8 needs indexmap 1.x
+# with std enabled in the build-dependency graph under Cargo resolver v2.
+indexmap = { version = "1.9", features = ["std"] }
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
 vk-core = { path = "../../crates/vk-core", features = ["serde"] }
+indexmap = { version = "1.9", features = ["std"] }
 tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
