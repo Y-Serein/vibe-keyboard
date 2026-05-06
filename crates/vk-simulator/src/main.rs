@@ -571,7 +571,7 @@ mod tests {
         };
         let output = execute_subcommand(&cmd);
         assert!(output.contains("[sim] test-pattern rendered"));
-        assert!(output.contains("800x340"));
+        assert!(output.contains("960x412"));
         assert!(output.contains("\x1b[38;2;"));
     }
 
@@ -581,7 +581,7 @@ mod tests {
             action: "status".into(),
         };
         let output = execute_subcommand(&cmd);
-        assert!(output.contains("800x340"));
+        assert!(output.contains("960x412"));
         assert!(output.contains("half-block"));
     }
 

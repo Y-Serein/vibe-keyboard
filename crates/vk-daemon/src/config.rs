@@ -33,12 +33,12 @@ pub struct DisplayConfig {
 
 impl Default for DisplayConfig {
     fn default() -> Self {
-        Self { width: 800, height: 340 }
+        Self { width: 960, height: 412 }
     }
 }
 
-fn default_lcd_width() -> u16 { 800 }
-fn default_lcd_height() -> u16 { 340 }
+fn default_lcd_width() -> u16 { 960 }
+fn default_lcd_height() -> u16 { 412 }
 
 /// Sound configuration.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

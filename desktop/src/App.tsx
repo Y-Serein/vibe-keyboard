@@ -152,7 +152,7 @@ function App() {
             fontSize: "var(--font-size-sm)",
             fontWeight: 600,
             marginBottom: "12px",
-            width: "580px",
+            width: "720px",
             textAlign: "center",
           }}
         >
@@ -169,7 +169,7 @@ function App() {
             borderRadius: "var(--radius-xl)",
             padding: "16px",
             boxShadow: "var(--shadow-container)",
-            width: "580px",
+            width: "720px",
             maxWidth: "calc(100vw - 40px)",
           }}
         >

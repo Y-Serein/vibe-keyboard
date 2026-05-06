@@ -13,8 +13,8 @@
     "windows": [
       {
         "title": "Vibe Keyboard",
-        "width": 680,
-        "height": 820,
+        "width": 820,
+        "height": 900,
         "resizable": true,
         "fullscreen": false
       }

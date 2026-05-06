@@ -102,7 +102,7 @@ mod tests {
 
     #[test]
     fn terminal_rows_needed_calculation() {
-        assert_eq!(terminal_rows_needed(340), 170);
+        assert_eq!(terminal_rows_needed(412), 206);
         assert_eq!(terminal_rows_needed(1), 1);
         assert_eq!(terminal_rows_needed(0), 0);
         assert_eq!(terminal_rows_needed(3), 2);

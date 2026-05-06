@@ -9,13 +9,13 @@ use vk_protocol::message::SessionStatus;
 
 use crate::screen::{AllowOption, ScreenState, ScreenStateMachine};
 use crate::widget::{
-    draw_divider, draw_text, draw_text_large, Align, Label, Rect, StatusBar,
-    FONT_H, FONT_W, FONT_H_LG, FONT_W_LG,
+    draw_divider, draw_text, draw_text_md, draw_text_sm, draw_text_tiny, Align, Label, Rect, StatusBar,
+    FONT_H, FONT_W, FONT_H_MD, FONT_W_MD, FONT_H_SM, FONT_W_SM, FONT_H_TINY, FONT_W_TINY,
 };
 
-/// LCD dimensions.
-pub const LCD_W: u16 = 800;
-pub const LCD_H: u16 = 340;
+/// LCD dimensions (3.4" panel, 412×960 native portrait, mounted landscape = 960×412).
+pub const LCD_W: u16 = 960;
+pub const LCD_H: u16 = 412;
 
 /// Color palette (inspired by SC's GitHub dark theme).
 pub const BG_COLOR: Rgb565 = Rgb565::BLACK;
@@ -43,7 +43,7 @@ pub fn render(sm: &ScreenStateMachine, fb: &mut DynFramebuffer, ctx: &RenderCont
 
     match sm.state() {
         ScreenState::Standby => render_standby(sm, fb, ctx),
-        ScreenState::Normal => render_normal(sm, fb),
+        ScreenState::Normal => render_normal(sm, fb, ctx),
         ScreenState::Select => render_select(sm, fb),
         ScreenState::Allow => render_allow(sm, fb),
         ScreenState::Notify => render_notify(sm, fb),
@@ -79,156 +79,261 @@ fn render_standby(sm: &ScreenStateMachine, fb: &mut DynFramebuffer, ctx: &Render
     }
 }
 
-/// Normal: SC-style single session detail — one field per line, bright colors.
-fn render_normal(sm: &ScreenStateMachine, fb: &mut DynFramebuffer) {
+/// Normal: multi-session OVERVIEW dashboard inspired by Image1.png.
+/// All text uses SM font (12×20). Active row distinguished by amber border + accent colors.
+fn render_normal(sm: &ScreenStateMachine, fb: &mut DynFramebuffer, ctx: &RenderContext) {
     let w = fb.width();
+    let h = fb.height();
     let sessions = sm.sessions();
-    let idx = sm.active_index();
+    let active_idx = sm.active_index().min(sessions.len().saturating_sub(1));
+    let pad = 12u16;
 
+    // ── Column layout: x positions and widths (gap=10 between cols, all in 960px width) ──
+    let cols: [(u16, &str); 8] = [
+        (pad,         "SESSION"),
+        (pad + 106,   "TOOL"),
+        (pad + 248,   "MODE"),
+        (pad + 330,   "MODEL"),
+        (pad + 436,   "COST"),
+        (pad + 542,   "PLAN USAGE LIMITS"),
+        (pad + 762,   "RESETS IN"),
+        (pad + 880,   "STATE"),
+    ];
+    // PLAN bar starts after "100% " text (~5 chars * 12 = 60px) within col 5, ends before col 6.
+    let bar_start = cols[5].0 + 60;
+    let bar_end = cols[6].0.saturating_sub(8);
+
+    // ── Top header bar (all SM) ──
+    let hy = 10u16;
+    draw_text_sm(fb, pad, hy, "OVERVIEW", ALERT_COLOR);
+
+    let active_count = sessions
+        .iter()
+        .filter(|s| !matches!(s.status, SessionStatus::Idle | SessionStatus::Done))
+        .count();
+    let avg_ctx: u32 = if sessions.is_empty() {
+        0
+    } else {
+        sessions.iter().map(|s| s.context_pct as u32).sum::<u32>() / sessions.len() as u32
+    };
+    let total_cost: f64 = sessions.iter().map(|s| s.cost_usd).sum();
+
+    let active_str = format!("{active_count} active");
+    let win_str = "5h rolling window";
+    let avg_str = format!("avg {avg_ctx}%");
+    let total_str = format!("total spend ${total_cost:.2}");
+
+    let mut sx = pad + 8 * FONT_W_SM + 24;
+    draw_text_sm(fb, sx, hy, &active_str, ALERT_COLOR);
+    sx += active_str.len() as u16 * FONT_W_SM + 18;
+    draw_text_sm(fb, sx, hy, win_str, MUTED_COLOR);
+    sx += win_str.len() as u16 * FONT_W_SM + 18;
+    draw_text_sm(fb, sx, hy, &avg_str, MUTED_COLOR);
+    sx += avg_str.len() as u16 * FONT_W_SM + 18;
+    draw_text_sm(fb, sx, hy, &total_str, MUTED_COLOR);
+
+    // Time on right (SM)
+    if !ctx.time_str.is_empty() {
+        let tw = ctx.time_str.len() as u16 * FONT_W_SM;
+        draw_text_sm(fb, w.saturating_sub(tw + pad), hy, &ctx.time_str, MUTED_COLOR);
+    }
+
+    let mut y = hy + FONT_H_SM + 14;
+
+    // Empty state.
     if sessions.is_empty() {
+        let label = Label::new("NO ACTIVE SESSIONS", MUTED_COLOR).aligned(Align::Center);
+        label.render(fb, Rect::new(0, h / 2, w, FONT_H_SM));
         return;
     }
 
-    let session = &sessions[idx.min(sessions.len() - 1)];
-    let line_h = FONT_H + 2; // field line height (tight to fill 340px)
-    let pad = 6u16;
-    let val_x = pad + 10 * FONT_W; // value column
-    let mut y = pad;
-
-    // ── Row 1: Title (LARGE font) + source badge + counter ──
-    draw_text_large(fb, pad, y, &session.name, TEXT_COLOR);
-    // Source badge (normal font, after title)
-    if !session.source.is_empty() {
-        let badge = match session.source.as_str() {
-            "claude-code" => "CC",
-            "cursor" => "CUR",
-            "codex" => "CDX",
-            "opencode" => "OC",
-            "gemini" => "GEM",
-            _ => &session.source,
-        };
-        let badge_x = pad + session.name.len() as u16 * FONT_W_LG + FONT_W; // tight: 1 normal-font space after title
-        let badge_color = match badge {
-            "CC" => ALERT_COLOR,
-            "CUR" => PURPLE_COLOR,
-            "CDX" => ACCENT_COLOR,
-            "OC" => BLUE_COLOR,
-            "GEM" => CYAN_COLOR,
-            _ => MUTED_COLOR,
-        };
-        draw_text(fb, badge_x, y + (FONT_H_LG - FONT_H) / 2, badge, badge_color);
+    // ── Column headers (SM, muted) ──
+    for (cx, label) in cols.iter() {
+        draw_text_sm(fb, *cx, y, label, MUTED_COLOR);
     }
-    // Counter right (normal font, in title row)
-    let count_str = format!("{}/{}", idx + 1, sessions.len());
-    let count_w = count_str.len() as u16 * FONT_W;
-    draw_text(fb, w.saturating_sub(count_w + pad), y + (FONT_H_LG - FONT_H) / 2, &count_str, CYAN_COLOR);
-    y += FONT_H_LG + 1; // tight gap between title and fields
+    y += FONT_H_SM + 16;
 
-    // ── Notify badge (compact: "*N 🔔", top-right corner) ──
-    let badge_w = 4 * FONT_W + 4;
-    let unread = sm.unread_count();
-    if unread > 0 {
-        let has_urgent = sm.notifications().iter().any(|n| {
-            !n.read && matches!(n.status, SessionStatus::Error | SessionStatus::PermissionNeeded)
-        });
-        let badge_color = if has_urgent { RED_COLOR } else { BLUE_COLOR };
-        let bx = w - badge_w - pad;
-        let by = pad + FONT_H_LG + 2; // just below title
-        let bh = FONT_H + 4;
-        // Background + border
-        fb.fill_rect(bx, by, badge_w, bh, Rgb565(0x1928));
-        for dx in bx..bx+badge_w { fb.draw_pixel(dx, by, badge_color); fb.draw_pixel(dx, by + bh - 1, badge_color); }
-        for dy in by..by+bh { fb.draw_pixel(bx, dy, badge_color); fb.draw_pixel(bx + badge_w - 1, dy, badge_color); }
-        // "*N" + bell
-        let badge_str = format!("*{}", unread);
-        draw_text(fb, bx + 2, by + 2, &badge_str, badge_color);
-    }
+    // ── Data rows: active vertically centered, others stack above/below ──
+    // Reserve room for bottom TINY status line (16px CJK glyph + 14px margin).
+    let bottom_bar_reserve = 30u16;
+    let avail_top = y;
+    let avail_bottom = h.saturating_sub(bottom_bar_reserve);
+    let avail_center = (avail_top + avail_bottom) / 2;
 
-    // ── Row 2: Status + LIVE badge ──
-    draw_text(fb, pad, y, "Status", DIVIDER_COLOR);
-    let st = status_text(session.status);
-    draw_text(fb, val_x, y, st, status_color(session.status));
-    if matches!(session.status, SessionStatus::Thinking | SessionStatus::ToolUse | SessionStatus::Writing) {
-        let live_x = val_x + (st.len() as u16 + 1) * FONT_W;
-        draw_text(fb, live_x, y, "LIVE", ACCENT_COLOR);
-    }
-    let pending = sm.permissions().len();
-    if pending > 0 {
-        let alert = format!("[!{}]", pending);
-        let aw = alert.len() as u16 * FONT_W;
-        draw_text(fb, w.saturating_sub(badge_w + aw + pad + 4), y, &alert, ALERT_COLOR);
-    }
-    y += line_h;
+    let row_h: u16 = 32;
+    let row_gap: u16 = 18;
+    let total_row_step = row_h + row_gap;
 
-    // ── Row 3: Model ──
-    if !session.model.is_empty() {
-        draw_text(fb, pad, y, "Model", DIVIDER_COLOR);
-        draw_text(fb, val_x, y, &session.model, BLUE_COLOR);
-        y += line_h;
-    }
+    let active_top = avail_center.saturating_sub(row_h / 2);
+    draw_session_row_v2(fb, cols, bar_start, bar_end, &sessions[active_idx], active_idx, active_top, row_h, true);
 
-    // ── Row 4: Context (percentage + bordered bar) ──
-    {
-        draw_text(fb, pad, y, "Context", DIVIDER_COLOR);
-        let ctx_window = if session.model.contains("opus") { "1M" } else { "200k" };
-        let pct_str = format!("{}% of {}", session.context_pct, ctx_window);
-        let bar_color = context_bar_color(session.context_pct as u16);
-        draw_text(fb, val_x, y, &pct_str, bar_color);
-        // Bordered progress bar
-        let bar_x = val_x + (pct_str.len() as u16 + 1) * FONT_W;
-        let bar_end = w.saturating_sub(pad + badge_w + 8); // leave space for notify badge
-        if bar_x < bar_end {
-            let bar_w = bar_end - bar_x;
-            let bar_h = FONT_H - 4;
-            let bar_y_off = y + 2;
-            // Border
-            for bx in bar_x..bar_x+bar_w { fb.draw_pixel(bx, bar_y_off, DIVIDER_COLOR); fb.draw_pixel(bx, bar_y_off + bar_h - 1, DIVIDER_COLOR); }
-            for by in bar_y_off..bar_y_off+bar_h { fb.draw_pixel(bar_x, by, DIVIDER_COLOR); fb.draw_pixel(bar_x + bar_w - 1, by, DIVIDER_COLOR); }
-            // Fill
-            let iw = bar_w.saturating_sub(2);
-            let ih = bar_h.saturating_sub(2);
-            let fill = (iw as u32 * session.context_pct as u32 / 100).min(iw as u32) as u16;
-            fb.fill_rect(bar_x + 1, bar_y_off + 1, fill, ih, bar_color);
-            fb.fill_rect(bar_x + 1 + fill, bar_y_off + 1, iw - fill, ih, Rgb565(0x1082));
+    // Sessions before active: stack upward.
+    let mut prev_y = active_top;
+    for offset in 1..=active_idx {
+        let i = active_idx - offset;
+        if prev_y < avail_top + total_row_step {
+            break;
         }
-        y += line_h;
+        prev_y = prev_y.saturating_sub(total_row_step);
+        draw_session_row_v2(fb, cols, bar_start, bar_end, &sessions[i], i, prev_y, row_h, false);
     }
 
-    // ── Row 5: Cost ──
-    if session.cost_usd > 0.0 {
-        draw_text(fb, pad, y, "Cost", DIVIDER_COLOR);
-        let cost_str = format!("${:.2}", session.cost_usd);
-        draw_text(fb, val_x, y, &cost_str, YELLOW_COLOR);
-        y += line_h;
+    // Sessions after active: stack downward.
+    let mut next_y = active_top + total_row_step;
+    for i in (active_idx + 1)..sessions.len() {
+        if next_y + row_h > avail_bottom {
+            break;
+        }
+        draw_session_row_v2(fb, cols, bar_start, bar_end, &sessions[i], i, next_y, row_h, false);
+        next_y += total_row_step;
     }
 
-    // ── Row 6: Tokens ──
-    if session.tokens_in > 0 || session.tokens_out > 0 {
-        draw_text(fb, pad, y, "Tokens", DIVIDER_COLOR);
-        let tok = format!("{} in  {} out", format_k(session.tokens_in), format_k(session.tokens_out));
-        draw_text(fb, val_x, y, &tok, TEXT_COLOR);
-        y += line_h;
-    }
-
-    // ── Bottom: User's last input (1 line, divider above) ──
-    if !session.last_message.is_empty() {
-        let bottom_y = fb.height().saturating_sub(FONT_H + 6);
-        if y < bottom_y {
-            draw_divider(fb, bottom_y.saturating_sub(2), w, DIVIDER_COLOR);
-            let max_w = w.saturating_sub(pad * 2);
-            let mut line_w = 0u16;
-            let mut end = 0;
-            let chars: Vec<char> = session.last_message.chars().collect();
-            while end < chars.len() {
-                let cw = if chars[end].is_ascii() { FONT_W } else { 32 };
-                if line_w + cw > max_w { break; }
-                line_w += cw;
-                end += 1;
-            }
-            let msg: String = chars[..end].iter().collect();
-            draw_text(fb, pad, bottom_y, &msg, CYAN_COLOR);
+    // ── Bottom status line (TINY — half the size of data rows) ──
+    // TINY ASCII = 10px tall, TINY CJK = 16px tall (UNI_SCALE_TINY=1).
+    // Reserve enough room for the larger CJK glyph height.
+    let bottom_y = h.saturating_sub(16 + 6);
+    let active = &sessions[active_idx];
+    let mut bx = pad;
+    let segments: [(&str, String, Rgb565); 4] = [
+        ("focus:", active.name.to_uppercase(), ALERT_COLOR),
+        ("task:", first_line_truncated(&active.last_message, 240, FONT_W_TINY), TEXT_COLOR),
+        ("cost:", format!("${:.2}", active.cost_usd), TEXT_COLOR),
+        ("now:", first_line_truncated(&active.last_ai_output, 280, FONT_W_TINY), TEXT_COLOR),
+    ];
+    for (label, value, color) in segments.iter() {
+        draw_text_tiny(fb, bx, bottom_y, label, MUTED_COLOR);
+        bx += label.len() as u16 * FONT_W_TINY + 4;
+        draw_text_tiny(fb, bx, bottom_y, value, *color);
+        // For ASCII chars the width is FONT_W_TINY each; CJK is wider — count chars × avg.
+        let value_w: u16 = value.chars().map(|c| if c.is_ascii() { FONT_W_TINY } else { 16 }).sum();
+        bx += value_w + 18;
+        if bx >= w.saturating_sub(pad) {
+            break;
         }
     }
+}
+
+/// Draw one session row at row_top, all 8 columns on a single SM-font line.
+/// Active row gets an amber border + accent-colored values.
+fn draw_session_row_v2(
+    fb: &mut DynFramebuffer,
+    cols: [(u16, &str); 8],
+    bar_start: u16,
+    bar_end: u16,
+    session: &crate::screen::UiSession,
+    idx: usize,
+    row_top: u16,
+    row_h: u16,
+    is_active: bool,
+) {
+    let w = fb.width();
+    let pad = 12u16;
+
+    // Border for active row.
+    if is_active {
+        let bx = pad - 6;
+        let bw = w.saturating_sub(2 * (pad - 6));
+        let by = row_top.saturating_sub(2);
+        let bh = row_h;
+        for dx in bx..bx + bw {
+            fb.draw_pixel(dx, by, ALERT_COLOR);
+            fb.draw_pixel(dx, by + bh - 1, ALERT_COLOR);
+        }
+        for dy in by..by + bh {
+            fb.draw_pixel(bx, dy, ALERT_COLOR);
+            fb.draw_pixel(bx + bw - 1, dy, ALERT_COLOR);
+        }
+    }
+
+    let row_mid = row_top + (row_h - FONT_H_SM) / 2;
+    let primary = if is_active { ALERT_COLOR } else { TEXT_COLOR };
+
+    let mode = match idx % 3 {
+        0 => "PLAN",
+        1 => "AUTO",
+        _ => "REVIEW",
+    };
+    let (state_str, state_color) = state_label_color(session.status);
+
+    draw_text_sm(fb, cols[0].0, row_mid, &session.name.to_uppercase(), primary);
+    draw_text_sm(fb, cols[1].0, row_mid, source_full_name(&session.source), MUTED_COLOR);
+    draw_text_sm(fb, cols[2].0, row_mid, mode, ALERT_COLOR);
+    draw_text_sm(fb, cols[3].0, row_mid, &abbrev_model(&session.model), MUTED_COLOR);
+    draw_text_sm(fb, cols[4].0, row_mid, &format!("${:.2}", session.cost_usd), primary);
+    draw_text_sm(fb, cols[5].0, row_mid, &format!("{}%", session.context_pct), primary);
+
+    // Segmented progress bar in PLAN USAGE LIMITS column.
+    if bar_start + 24 < bar_end {
+        let bar_y = row_mid + (FONT_H_SM.saturating_sub(14)) / 2;
+        draw_segmented_bar(fb, bar_start, bar_y, bar_end - bar_start, 14, session.context_pct as u16);
+    }
+
+    draw_text_sm(fb, cols[6].0, row_mid, "—", MUTED_COLOR);
+    draw_text_sm(fb, cols[7].0, row_mid, state_str, state_color);
+}
+
+/// Map source ID to display name shown in TOOL column.
+fn source_full_name(s: &str) -> &'static str {
+    match s {
+        "claude-code" => "Claude Code",
+        "cursor" => "Cursor",
+        "codex" => "Codex",
+        "opencode" => "OpenCode",
+        "gemini" => "Gemini",
+        _ => "?",
+    }
+}
+
+/// Map status enum to STATE column label + color.
+fn state_label_color(status: SessionStatus) -> (&'static str, Rgb565) {
+    match status {
+        SessionStatus::Done => ("DONE", ACCENT_COLOR),
+        SessionStatus::Error => ("ERR", RED_COLOR),
+        SessionStatus::PermissionNeeded => ("WAIT", ALERT_COLOR),
+        SessionStatus::Idle => ("IDLE", MUTED_COLOR),
+        SessionStatus::Thinking | SessionStatus::Writing | SessionStatus::ToolUse => ("RUN", ALERT_COLOR),
+    }
+}
+
+/// Render a segmented progress bar (12 segments, image1-style chunks).
+fn draw_segmented_bar(fb: &mut DynFramebuffer, x: u16, y: u16, total_w: u16, h: u16, pct: u16) {
+    let segments: u16 = 12;
+    if total_w < segments {
+        return;
+    }
+    let gap = 1u16;
+    let seg_w = (total_w + gap) / segments - gap;
+    let active_segs = (pct.min(100) as u32 * segments as u32 / 100) as u16;
+    for i in 0..segments {
+        let sx = x + i * (seg_w + gap);
+        let color = if i < active_segs { ALERT_COLOR } else { DIVIDER_COLOR };
+        fb.fill_rect(sx, y, seg_w, h, color);
+    }
+}
+
+/// Shorten model name for the table cell ("claude-opus-4-7" → "opus-4.7").
+fn abbrev_model(s: &str) -> String {
+    if let Some(rest) = s.strip_prefix("claude-") {
+        rest.replace("-", ".").replacen(".", "-", 1)
+    } else {
+        s.to_string()
+    }
+}
+
+/// Take the first line of a string, truncated to fit the given pixel width.
+fn first_line_truncated(s: &str, max_w: u16, char_w: u16) -> String {
+    let first_line = s.lines().next().unwrap_or("").trim();
+    let mut out = String::new();
+    let mut acc = 0u16;
+    for ch in first_line.chars() {
+        let cw = if ch.is_ascii() { char_w } else { char_w * 2 };
+        if acc + cw > max_w {
+            break;
+        }
+        acc += cw;
+        out.push(ch);
+    }
+    out
 }
 
 /// Format a number with 'k' suffix for thousands.

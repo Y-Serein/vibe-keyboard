@@ -1,4 +1,4 @@
-//! Widget system — self-drawing components for the 800×340 LCD.
+//! Widget system — self-drawing components for the 960×412 LCD.
 //!
 //! Each widget knows how to render itself to a framebuffer region.
 //! Widgets are simple value types with no internal state beyond their data.
@@ -31,7 +31,7 @@ pub enum Align {
 }
 
 /// Bitmap font: 24×40 pixel fixed-width glyphs (scaled from 6×10 base, 4x).
-/// Fills 800×340 LCD better than 3x.
+/// Fills 960×412 LCD.
 pub const FONT_W: u16 = 24;
 pub const FONT_H: u16 = 40;
 
@@ -190,6 +190,88 @@ pub fn draw_text(fb: &mut DynFramebuffer, x: u16, y: u16, text: &str, color: Rgb
             }
         }
     }
+}
+
+/// Medium font (3x scale: 18×30). For emphasized rows like the active session.
+pub const FONT_W_MD: u16 = 18;
+pub const FONT_H_MD: u16 = 30;
+const SCALE_MD: u16 = 3;
+const UNI_SCALE_MD: u16 = 2;
+
+/// Small font (2x scale: 12×20). For dense data rows on the high-DPI panel.
+pub const FONT_W_SM: u16 = 12;
+pub const FONT_H_SM: u16 = 20;
+const SCALE_SM: u16 = 2;
+const UNI_SCALE_SM: u16 = 2;
+
+/// Tiny font (1x scale: 6×10). For caption-like labels (table headers).
+pub const FONT_W_TINY: u16 = 6;
+pub const FONT_H_TINY: u16 = 10;
+const SCALE_TINY: u16 = 1;
+const UNI_SCALE_TINY: u16 = 1;
+
+/// Internal: render text at arbitrary scale (ASCII via bitmap, CJK via unifont).
+fn draw_text_at(
+    fb: &mut DynFramebuffer,
+    x: u16,
+    y: u16,
+    text: &str,
+    color: Rgb565,
+    sx: u16,
+    sy: u16,
+    uni_scale: u16,
+) {
+    let glyph_w = BASE_W * sx;
+    let mut cx = x;
+    for ch in text.chars() {
+        if cx + glyph_w > fb.width() {
+            break;
+        }
+        if ch.is_ascii() {
+            draw_char_scaled(fb, cx, y, ch as u8, color, sx, sy);
+            cx += glyph_w;
+        } else if let Some(g) = unifont::get_glyph(ch) {
+            let gw = if g.get_width() == 16 { 16u16 } else { 8u16 };
+            let dw = gw * uni_scale;
+            if cx + dw > fb.width() {
+                break;
+            }
+            for row in 0..16u16 {
+                for col in 0..gw {
+                    if g.get_pixel(col as usize, row as usize) {
+                        let px = cx + col * uni_scale;
+                        let py = y + row * uni_scale;
+                        for dy in 0..uni_scale {
+                            for dx in 0..uni_scale {
+                                if py + dy < fb.height() {
+                                    fb.draw_pixel(px + dx, py + dy, color);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            cx += dw;
+        } else {
+            draw_char_scaled(fb, cx, y, b'?', color, sx, sy);
+            cx += glyph_w;
+        }
+    }
+}
+
+/// Render text at medium scale (18×30) — for emphasized/active rows.
+pub fn draw_text_md(fb: &mut DynFramebuffer, x: u16, y: u16, text: &str, color: Rgb565) {
+    draw_text_at(fb, x, y, text, color, SCALE_MD, SCALE_MD, UNI_SCALE_MD);
+}
+
+/// Render text at small scale (12×20).
+pub fn draw_text_sm(fb: &mut DynFramebuffer, x: u16, y: u16, text: &str, color: Rgb565) {
+    draw_text_at(fb, x, y, text, color, SCALE_SM, SCALE_SM, UNI_SCALE_SM);
+}
+
+/// Render text at tiny scale (6×10) — for caption rows like table headers.
+pub fn draw_text_tiny(fb: &mut DynFramebuffer, x: u16, y: u16, text: &str, color: Rgb565) {
+    draw_text_at(fb, x, y, text, color, SCALE_TINY, SCALE_TINY, UNI_SCALE_TINY);
 }
 
 /// A simple text label widget.

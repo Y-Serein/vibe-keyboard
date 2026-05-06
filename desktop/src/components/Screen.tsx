@@ -5,9 +5,12 @@ interface ScreenProps {
   mode: "standby" | "normal" | "select" | "allow" | "notify";
 }
 
+const NATIVE_W = 960;
+const NATIVE_H = 412;
+
 /**
  * LCD Screen — renders daemon's framebuffer via Canvas putImageData.
- * Falls back to text-based display if no frame data arrives.
+ * Native resolution: 960×412 (3.4" panel mounted landscape).
  */
 function Screen(props: ScreenProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -25,14 +28,12 @@ function Screen(props: ScreenProps) {
         if (canvas.width !== width) canvas.width = width;
         if (canvas.height !== height) canvas.height = height;
 
-        // Decode base64 to RGB565 bytes
         const binary = atob(pixels_b64);
         const rgb565 = new Uint8Array(binary.length);
         for (let i = 0; i < binary.length; i++) {
           rgb565[i] = binary.charCodeAt(i);
         }
 
-        // Convert RGB565 to RGBA ImageData
         const imageData = ctx.createImageData(width, height);
         const pixelCount = width * height;
         for (let i = 0; i < pixelCount; i++) {
@@ -64,15 +65,17 @@ function Screen(props: ScreenProps) {
       marginBottom: "14px",
       overflow: "hidden",
       border: props.mode === "allow" ? "2px solid #34d399" : "2px solid #1f2937",
+      aspectRatio: `${NATIVE_W} / ${NATIVE_H}`,
     }}>
       <canvas
         ref={canvasRef}
-        width={800}
-        height={340}
+        width={NATIVE_W}
+        height={NATIVE_H}
         style={{
           width: "100%",
+          height: "100%",
           display: "block",
-          imageRendering: "pixelated",
+          imageRendering: "auto",
           borderRadius: "8px",
         }}
       />
